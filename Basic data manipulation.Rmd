@@ -1,0 +1,77 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. When you execute code within the notebook, the results appear beneath the code. 
+
+Try executing this chunk by clicking the *Run* button within the chunk or by placing your cursor inside it and pressing *Ctrl+Shift+Enter*. 
+
+```{r}
+plot(cars)
+```
+
+Add a new chunk by clicking the *Insert Chunk* button on the toolbar or by pressing *Ctrl+Alt+I*.
+
+When you save the notebook, an HTML file containing the code and output will be saved alongside it (click the *Preview* button or press *Ctrl+Shift+K* to preview the HTML file).
+```{r}
+refine_original <- read.csv("C:/Users/bthomas/Documents/Data Wranglinge/refine_original.csv",stringsAsFactors = FALSE)
+#refine_original$company
+#grep(pattern = "ps*",x=refine_original$company)
+#gsub(pattern = "ps*",replacement = "philips",x =refine_original$company)
+refine_original$company <-replace(refine_original$company, grepl("ps*", refine_original$company), "philips")
+refine_original$company <-replace(refine_original$company, grepl("^van",refine_original$company,ignore.case = TRUE), "van houten")
+refine_original$company <-replace(refine_original$company, grepl("^a",refine_original$company,ignore.case = TRUE), "akzo")
+refine_original$company <-replace(refine_original$company, grepl("^u",refine_original$company,ignore.case = TRUE), "unilever")
+#refine_original$company
+#refine_original
+#a <-strsplit(refine_original$Product.code...number, split = "-", fixed = TRUE)
+newcols <-data.frame(refine_original$Product.code...number, do.call(rbind, strsplit(refine_original$Product.code...number, split = "-", fixed = TRUE)))
+names(newcols) <- c("Product code_number", "Product code","Product number")
+#newcols
+
+refine_original <- cbind(refine_original, newcols[2],newcols[3])
+#category <- function(x) { 
+#if(x == "p") y <- "Smartphone"
+#if(x == "x") y <- "Laptop"
+#if(x == "v") y <- "TV"
+#if(x == "q") y <- "Tablet"
+#return(y)
+#}
+refine_original <- 
+    transform(
+        refine_original,
+        category =
+            ifelse( refine_original$`Product code` == "p" , "Smartphone" ,
+            ifelse( refine_original$`Product code` == "x" , "Laptop" ,
+            ifelse( refine_original$`Product code` == "v" , "TV" ,
+            ifelse( refine_original$`Product code` == "q" , "Tablet",""
+                    
+                  ) ) ) ) )
+
+full_address <- paste(refine_original$address,refine_original$city,refine_original$country,sep = ",")
+refine_original <- cbind(refine_original, full_address)
+refine_original <- 
+    transform(
+        refine_original,
+        company_philips =
+            ifelse( refine_original$company == "philips" , 1, 0),
+        company_akzo =
+            ifelse( refine_original$company == "akzo" , 1, 0),
+        company_van_houten =
+            ifelse( refine_original$company == "van houten" , 1, 0),
+        company_unilever =
+            ifelse( refine_original$company == "unilever" , 1, 0),
+        product_laptop =
+            ifelse( refine_original$category == "Laptop" , 1, 0),
+        product_smartphone =
+            ifelse( refine_original$company == "Smartphone" , 1, 0),
+        product_tv =
+            ifelse( refine_original$category == "TV" , 1, 0),
+        product_tablet =
+            ifelse( refine_original$company == "Tablet" , 1, 0      
+   
+ ) )
+write.csv(refine_original, file = "C:\\Users\\bthomas\\Documents\\Data Wranglinge\\refine_clean.csv")
+```
+
