@@ -1,0 +1,37 @@
+---
+title: "Titanic R"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+```{r}
+# 1 - Check the structure of titanic
+str(Titanic)
+```
+```{r}
+# 2 - Use ggplot() for the first instruction
+library(ggplot2)
+TitanicDF <-as.data.frame(Titanic)
+TitanicDF
+ggplot(TitanicDF, aes(x = Class, fill = Sex)) + geom_bar(position = "dodge")
+```
+
+```{r}
+# 3 - Plot 2, add facet_grid() layer
+ggplot(TitanicDF, aes(x = Class, fill = Sex)) + 
+  geom_bar(position = "dodge") + 
+  facet_grid(. ~ Survived)
+
+```
+
+```{r}
+# 4 - Define an object for position jitterdodge, to use below
+posn.jd <- position_jitterdodge(0.5, 0, 0.6)
+# 5 - Plot 3, but use the position object from instruction 4
+ggplot(TitanicDF, aes(x = Class,y = Age, col = Sex)) + 
+  geom_point(size=3,alpha=0.5,position=posn.jd) +
+  facet_grid(.~Survived)
+```
+
