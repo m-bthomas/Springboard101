@@ -1,0 +1,40 @@
+---
+title: "Capstone Project Proposal"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Capstone Project Proposal
+
+The goal of this project is to build a model that would predict the effect of temperature data on natural gas spot prices at the Henry Hub natural gas distribution hub in Erath, Louisiana.
+
+## Problem Statement
+
+Natural gas prices are very volatile and is somewhat dependent on daily temperatures for heating/cooling needs. A model that would quantify this effect would help natural gas companies balance their distribution and supply of natural gas drawdowns.
+
+## End User
+The client is any exploration & production company that produces and sells natural gas. 
+
+## Data Sources
+
+The EIA government website provides historical data for daily natural gas spot prices. By using an EIA provided API key, this data can be loaded into a .csv file for analysis. Weather Underground provides daily weather data for Erath, LA. A similar API call can be used to pull this data into another .csv file
+
+## Action Plan
+Using about 2 years' worth of spot price/weather data as our training set, we'll build a regression model that will help define the effect of weather data on spot prices. Then the model will be run over a test set of about 3 months of data to validate our model.
+
+## Deliverables
+
+All R markdown files and related documents will be uploaded to GitHub.
+```{r cars}
+summary(cars)
+```
+
+
+
+```{r pressure, echo=FALSE}
+plot(pressure)
+```
+
