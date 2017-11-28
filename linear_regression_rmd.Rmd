@@ -1,0 +1,69 @@
+---
+title: "linear_regression_rcmd"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+#This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+#When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks #within the document. You can embed an R code chunk like this:
+```
+
+```
+## Including Plots
+
+#You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+## Interactions and factors
+
+# read the states data
+states.data <- readRDS("C:/Users/bthomas/Documents/Data Wranglinge/linear_regression/dataSets/states.rds") 
+t <-attributes(states.data)
+t
+
+
+
+
+## Exercise: least squares regression
+## ────────────────────────────────────────
+
+##   Use the /states.rds/ data set. Fit a model predicting energy consumed
+##   per capita (energy) from the percentage of residents living in
+##   metropolitan areas (metro). Be sure to
+##   1. Examine/plot the data before fitting the model
+##   2. Print and interpret the model `summary'
+
+sts.energy.metro <- subset(states.data, select = c("metro", "energy"))
+summary(sts.energy.metro)
+# correlation 
+cor(sts.energy.metro)
+# why NA here?
+# scatter plot 
+plot(sts.energy.metro)
+##   3. `plot' the model to look for deviations from modeling assumptions
+# Fit our regression model
+sts.mod <- lm(metro ~ energy, # regression formula
+              data=states.data) # data set
+# Summarize and print the results
+summary(sts.mod) # show regression coefficients table
+##   Select one or more additional predictors to add to your model and
+##   repeat steps 1-3. Is this model significantly better than the model
+##   with /metro/ as the only predictor?
+st.energy.metro.density <-lm(metro ~ energy + density, data = states.data)
+summary(st.energy.metro.density)
+#Higher R-squared
+st.energy.metro.density.region <-lm(metro ~ energy + density + region, data = states.data)
+summary(st.energy.metro.density.region)
+#Even higher R-squared
+## Comparing models
+# compare using the anova() function
+anova(st.energy.metro.density, st.energy.metro.density.region)
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
