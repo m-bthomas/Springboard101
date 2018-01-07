@@ -1,0 +1,81 @@
+---
+title: "User_Function"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+```{r}
+#Read data in individual files into df
+#getwd()
+library("data.table")
+filelist <-list.files(path = "Files", pattern = ".csv", full.names = TRUE)
+#filelist
+temp <- lapply(filelist, fread, sep=",")
+weatherdata <- rbindlist(temp)
+#Create new date field in yyyymmdd formatt to line up with EIA data
+weatherdata <- within(weatherdata, intdate <- as.integer(date.year)*10000 + as.integer(date.mon)*100 + as.integer(date.mday))
+#head(weatherdata)
+#narrow df to fields of interest
+weatherdata <- weatherdata[,-c(1,3:5,7:14,17:45)] 
+#head(weatherdata)
+#New DF with weather data averaged by day
+weatherdataAvg <- aggregate(weatherdata[, 1:4], list(weatherdata$intdate), FUN = function(x) mean(as.numeric(as.character(x))))
+#head(weatherdataAvg)
+# Write new DF data to csv
+write.csv(weatherdataAvg, file = "Daily Weather Data.csv")
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+```{r cars}
+#API call for weather data
+library(lubridate)
+library(jsonlite)
+
+d <- as.Date('20151202', format = '%Y%m%d')
+for(i in 1:400){
+ date(d) <- date(d) + 1
+ intdate <-as.integer(format(date(d), "%Y%m%d"))
+ url <-paste0("http://api.wunderground.com/api/337b40a1234484ca/history_",intdate,"/q/LA/Erath.json")
+ #print(url)
+ raw.result <- fromJSON(url,flatten = TRUE)
+ df_weatherdata <- raw.result$history$observations
+ 
+ #Copy the structure for the running df and empty it only for first iteration - it gets appended on subsequent passes
+ # Not doing this - outputting to individual files
+ #if(i == 1) {
+  #    df_combined <- df_weatherdata[0,]
+  #  }
+ # Not using combined db because outputting to individual files
+ #df_combined <-rbind(df_combined,df_weatherdata)
+ #print(df_combined)
+ #write.csv(df_combined,file = paste0("Files/NG spot price history_",intdate,".csv"))
+ write.csv(df_weatherdata,file = paste0("Files/NG spot price history_",intdate,".csv"))
+           
+ Sys.sleep(5)
+ }
+#write.csv wipes out the file and does a complete rewrite on every execution
+
+#this can be used to append but col names is a true or a false
+ #write.table(df_combined, file = "NG spot price history1.csv", sep = ",", append = TRUE, quote = FALSE,
+ # col.names = FALSE, row.names = FALSE)
+
+
+
+```
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+plot(pressure)
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
