@@ -75,7 +75,23 @@ for(i in 1:400){
 You can also embed plots, for example:
 
 ```{r pressure, echo=FALSE}
-plot(pressure)
+#Combine the 2 datasets together
+library(dplyr)
+spotpf_df <- read.csv("eiaapipull.csv", header=TRUE)
+#Restrict spot prices to 2015 & 2016 to match data in weather file
+spotpf_df <- subset(spotpf_df, Date >= 20150101 & Date <= 20161231, select=c(Date, SpotPrice))
+
+weather_df <- read.csv("Daily Weather Data.csv", header=TRUE)
+#Rename Date column in weather data
+library("data.table")
+setnames(weather_df,c("Group.1"),c("Date"))
+#Remove rownumber 
+weather_df$X <- NULL
+head(weather_df)
+combined_df <- left_join(spotpf_df, weather_df, by = c("Date" = "Date"))
+# Write combined data file to csv
+write.csv(combined_df, file = "CombinedDataSet.csv")
+
 ```
 
 Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
