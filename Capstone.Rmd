@@ -1,0 +1,326 @@
+---
+title: "Capstone Project"
+author: "B Thomas"
+date: "January 25, 2018"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+#Related files in chunk below
+#Daily Weather Data.csv
+#eiaapipull.csv
+#CombinedDataSet.csv
+```{r}
+#API call for weather data from Weather Underground site for the Henry Hub location
+library(lubridate)
+library(jsonlite)
+
+d <- as.Date('20151202', format = '%Y%m%d')
+for(i in 1:400){
+ date(d) <- date(d) + 1
+ intdate <-as.integer(format(date(d), "%Y%m%d"))
+ url <-paste0("http://api.wunderground.com/api/337b40a1234484ca/history_",intdate,"/q/LA/Erath.json")
+ raw.result <- fromJSON(url,flatten = TRUE)
+ df_weatherdata <- raw.result$history$observations
+ 
+ #Write to individual files for each day
+ write.csv(df_weatherdata,file = paste0("Files/Weather history_",intdate,".csv"))
+ 
+ #Weather Underground has a restriction on the number of calls per minute - so built a pause          
+ Sys.sleep(5)
+}
+
+#Read data in individual files into df
+library("data.table")
+filelist <-list.files(path = "Files", pattern = ".csv", full.names = TRUE)
+temp <- lapply(filelist, fread, sep=",")
+weatherdata <- rbindlist(temp)
+
+#Create new date field in yyyymmdd formatt to line up with EIA data
+weatherdata <- within(weatherdata, intdate <- as.integer(date.year)*10000 + as.integer(date.mon)*100 + as.integer(date.mday))
+
+#narrow df to fields of interest
+weatherdata <- weatherdata[,-c(1,3:5,7:14,17:45)] 
+
+# remove rows that have a temperature value of -9999
+weatherdata <-weatherdata[!(weatherdata$tempm == -9999),]
+
+#New DF with weather data averaged by day to compare to Spot price history which is at the day level
+weatherdataAvg <- aggregate(weatherdata[, 1:4], list(weatherdata$intdate), FUN = function(x) mean(as.numeric(as.character(x))))
+
+# Write new DF data to csv
+write.csv(weatherdataAvg, file = "Daily Weather Data.csv")
+
+#Pull spot price history from EIA site
+key = "2633d01af08125753502af29c12e6864"
+series_id = "NG.RNGWHHD.D"
+url = paste0("http://api.eia.gov/series/?api_key=",key,"&series_id=",series_id)
+url
+raw.result <- fromJSON(url,flatten = TRUE)
+df = raw.result$series$data[[1]]
+colnames(df) = c('Date','SpotPrice')
+
+#Write spot prices to csv file
+write.csv(df,file="eiaapipull.csv")
+
+
+library(dplyr)
+spotpf_df <- read.csv("eiaapipull.csv", header=TRUE)
+
+#Restrict spot prices to 2015 & 2016 to generate training dataset
+spotpf_df <- subset(spotpf_df, Date >= 20150101 & Date <= 20161231, select=c(Date, SpotPrice))
+weather_df <- read.csv("Daily Weather Data.csv", header=TRUE)
+
+#Rename Date column in weather data
+library("data.table")
+setnames(weather_df,c("Group.1"),c("Date"))
+
+#Remove rownumber 
+weather_df$X <- NULL
+
+#Combine the weather data and spot price history together keyed by date
+combined_df <- left_join(spotpf_df, weather_df, by = c("Date" = "Date"))
+
+# Write combined data file to csv
+write.csv(combined_df, file = "CombinedDataSet.csv")
+```
+
+## Linear regression modelling
+#Related files in chunk below
+#CombinedDataSet.csv
+```{r}
+#****Try out different linreg models
+ModelData <-read.csv("CombinedDataSet.csv")
+
+#Model1 - Temp only
+Model1 <- lm(SpotPrice ~ tempm, data = ModelData)
+summary(Model1)
+SSE1 = sum(Model1$residuals ^ 2)
+SSE1
+
+#Model2 - Temp + humidity
+Model2 <- lm(SpotPrice ~ tempm + hum, data = ModelData)
+summary(Model2)
+SSE2 = sum(Model2$residuals ^ 2)
+SSE2
+
+#Model3 - Temp + humidity + pressure
+Model3 <- lm(SpotPrice ~ tempm + hum + pressurem + hum*pressurem, data = ModelData)
+summary(Model3)
+SSE3 = sum(Model3$residuals ^ 2)
+SSE3
+
+
+#Model4 - Temp + pressure
+Model4 <- lm(SpotPrice ~ tempm + pressurem, data = ModelData)
+summary(Model4)
+SSE4 = sum(Model4$residuals ^ 2)
+SSE4
+
+#Correlations
+cor(ModelData)
+
+#Plot the models - Model3 looks to be the best
+plot(Model3)
+plot(Model1)
+
+#check individual coefficients of model
+Model3$coefficients
+```
+## Test lin reg models
+#Related files in chunk below
+#Daily Weather Data Test.csv
+#eiaapipull.csv
+#CombinedDataSetTest.csv
+#Prediction_output.csv
+```{r}
+#****Generate test dataset  and test best model over it
+#Test over 2017 data - so repeat process to pull data from Weather Underground for 2017
+library(lubridate)
+library(jsonlite)
+
+d <- as.Date('20161231', format = '%Y%m%d')
+for(i in 1:360){
+ date(d) <- date(d) + 1
+ intdate <-as.integer(format(date(d), "%Y%m%d"))
+ url <-paste0("http://api.wunderground.com/api/337b40a1234484ca/history_",intdate,"/q/LA/Erath.json")
+ raw.result <- fromJSON(url,flatten = TRUE)
+ df_weatherdata <- raw.result$history$observations
+ write.csv(df_weatherdata,file = paste0("TestFiles/Weather_",intdate,".csv"))
+ sys.sleep(5)
+ }
+
+#Read data in individual files into df
+library("data.table")
+filelist <-list.files(path = "TestFiles", pattern = ".csv", full.names = TRUE)
+temp <- lapply(filelist, fread, sep=",")
+weatherdata <- rbindlist(temp)
+weatherdata <- within(weatherdata, intdate <- as.integer(date.year)*10000 + as.integer(date.mon)*100 + as.integer(date.mday))
+weatherdata <- weatherdata[,-c(1,3:5,7:14,17:45)] 
+weatherdata <-weatherdata[!(weatherdata$tempm == -9999),]
+weatherdataAvg <- aggregate(weatherdata[, 1:4], list(weatherdata$intdate), FUN = function(x) mean(as.numeric(as.character(x))))
+write.csv(weatherdataAvg, file = "Daily Weather Data Test.csv")
+
+#Combine the 2 test datasets together
+library(dplyr)
+spotpf_df <- read.csv("eiaapipull.csv", header=TRUE)
+
+#Restrict spot prices to 2017 
+spotpf_df <- subset(spotpf_df, Date >= 20170101 & Date <= 20171204, select=c(Date, SpotPrice))
+weather_df <- read.csv("Daily Weather Data Test.csv", header=TRUE)
+library("data.table")
+setnames(weather_df,c("Group.1"),c("Date"))
+weather_df$X <- NULL
+combined_df <- left_join(spotpf_df, weather_df, by = c("Date" = "Date"))
+write.csv(combined_df, file = "CombinedDataSetTest.csv")
+
+#Run predictions over test data
+prediction <-predict(Model3,combined_df)
+newoutput <-cbind(combined_df,prediction)
+write.csv(newoutput, file = "Prediction_output.csv")
+
+#SSE 
+prediction.sse <- sum((prediction -combined_df$SpotPrice)^2,na.rm = TRUE)
+prediction.sse
+
+```
+## Pre-processing the data before creating models
+#Related files in chunk below
+#CombinedDataSet.csv
+#CombinedDataSetTest.csv
+#Prediction_output_PP.csv
+```{r}
+#pre-processing exercise
+
+PPModelDF <-read.csv("CombinedDataSet.csv")
+#drop sequence number and pressurei from selection
+summary(PPModelDF[,2:7])
+#install.packages("caret")
+library(caret)
+
+# calculate the pre-process parameters from the dataset
+preprocessParams <- preProcess(PPModelDF[,2:7], method=c("center", "scale"))
+
+# summarize transform parameters
+print(preprocessParams)
+
+# transform the dataset using the parameters
+transformed <- predict(preprocessParams, PPModelDF[,2:7])
+
+# summarize the transformed dataset
+summary(transformed)
+
+#Build models using pre-processed data
+#Model 3 was the best model (temp + hum + pressure) in the previous exercise- Rsquared is the same as expected, SSE is 4-5 times higher
+PPModel3 <- lm(SpotPrice ~ tempm + hum + pressurem , data = transformed)
+summary(PPModel3)
+PPSSE3 = sum(PPModel3$residuals ^ 2)
+PPSSE3
+
+#check individual coefficients of model
+PPModel3$coefficients
+#The coefficients of the original model look to be much better (look in linear regression modelling chunk)
+
+#Preprocess test data before running predictions
+PPModelDF_Test <-read.csv("CombinedDataSetTest.csv")
+summary(PPModelDF_Test[,2:7])
+library(caret)
+preprocessParams <- preProcess(PPModelDF_Test[,2:7], method=c("center", "scale"))
+transformed_test <- predict(preprocessParams, PPModelDF_Test[,2:7])
+summary(transformed_test)
+
+
+#Run predictions over transformed test data using pre-processed model
+predictionPP <-predict(PPModel3,transformed_test)
+predictionPP
+
+# Predicted numbers are lower by a scale of 10
+newoutput <-cbind(PPModelDF_Test,predictionPP)
+write.csv(newoutput, file = "Prediction_output_PP.csv")
+
+```
+## Find and exclude outliers, generate model over a cleaner dataset
+#Related files in chunk below
+#CombinedDataSet.csv
+
+```{r}
+#Find outliers and exclude from data
+histDF <-read.csv("CombinedDataSet.csv")
+
+#Temp
+hist(histDF$tempm, breaks = 20, col = rgb(0,0,1,0.5))
+boxplot(histDF$tempm, col = rgb(0,0,1,0.5), main = "Boxplot of histDF$tempm")
+#We'll exclude rows with temp < 3
+
+#Pressure
+hist(histDF$pressurem, breaks = 20, col = rgb(0,0,1,0.5))
+boxplot(histDF$pressurem, col = rgb(0,0,1,0.5), main = "Boxplot of histDF$pressurem")
+#Only keep rows with pressure between 1008 and 1028
+
+#Humidity
+hist(histDF$hum, breaks = 20, col = rgb(0,0,1,0.5))
+boxplot(histDF$hum, col = rgb(0,0,1,0.5), main = "Boxplot of histDF$hum")
+#We'll exclude rows with humidity < 60
+
+#Drop outliers - observation count dropped from 516 to 477
+CleanhistDF <- subset(histDF, tempm > 3 & pressurem >= 1008 & pressurem <= 1028 & hum > 60)
+#str(CleanhistDF)
+
+#****Try out previously best performing model over cleaner dataset
+CleanDataModel <- lm(SpotPrice ~ tempm + hum + pressurem, data = CleanhistDF)
+summary(CleanDataModel)
+SSE = sum(CleanDataModel$residuals ^ 2)
+SSE
+#Adjust RSquared went down slightly from 0.1 to 0.098
+#SSE went down from 102 to 91
+#Not much different after dropping the outliers
+
+plot(CleanDataModel)
+CleanDataModel$coefficients
+```
+## Build a regression tree model
+#Related files in chunk below
+#CombinedDataSet.csv
+#CombinedDataSetTest.csv
+```{r}
+#Regression tree exercise
+TreeDF <-read.csv("CombinedDataSet.csv")
+TreeTestDF <-read.csv("CombinedDataSetTest.csv")
+
+#Libraries for regression tree methods
+library(rpart)
+#install.packages("rpart.plot")
+library(rpart.plot)
+TreeModel <- rpart(SpotPrice ~ tempm + hum + pressurem, data = TreeDF)
+prp(TreeModel)
+plot(TreeModel)
+text(TreeModel)
+#summary(TreeModel)
+TreeModel.pred <-predict(TreeModel,newdata = TreeTestDF)
+#TreeModel.pred
+
+#Determine SSE for regression tree - turned out to be better than regression model
+TreeModel.sse <- sum((TreeModel.pred-TreeTestDF$SpotPrice)^2)
+TreeModel.sse
+
+#Trim the tree to reduce the number of splits
+TreeTrimmedModel <- rpart(SpotPrice ~ tempm + hum + pressurem, data = TreeDF, minbucket = 25)
+prp(TreeTrimmedModel)
+
+#Determine SSE for trimmed model - turned out to be slightly better than the original tree model
+TreeTrimmedModel.pred <-predict(TreeTrimmedModel,newdata = TreeTestDF)
+TreeTrimmedModel.sse <- sum((TreeTrimmedModel.pred-TreeTestDF$SpotPrice)^2)
+TreeTrimmedModel.sse
+
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
